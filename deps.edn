@@ -4,7 +4,6 @@
                                       :git/sha "e8dad7269e9c35c1b023b7adc83a80cd23083d12"
                                       :exclusions [ring/ring-jetty-adapter]}
         metosin/malli                {:mvn/version "0.20.1"}
-        org.clojure/tools.namespace  {:mvn/version "1.5.0"}
         io.pedestal/pedestal.service {:mvn/version "0.8.1"}
         io.pedestal/pedestal.jetty   {:mvn/version "0.8.1"}
         nrepl/nrepl                  {:mvn/version "1.6.0"}}

@@ -39,12 +39,9 @@ An MCP client sees three tools:
 
 ## Sync — how Qdrant stays aligned with code
 
-`tools.sync/sync!` enumerates every var tagged with `:tool/name`, diffs it against Qdrant via `clojure.data/diff` on id-indexed maps, and either upserts (with a fresh embedding of `"<action-name>\n\n<description>"`), updates the payload in-place (when only non-content fields changed), or deletes (for tools removed from code). It runs **exactly once per JVM lifecycle — inside the `:pedestal/server` init-key, just before Jetty starts**. Any sync error aborts startup; launchd's `KeepAlive` restart-loops until the cause is fixed.
+`tools.sync/sync!` enumerates every var tagged with `:tool/name`, diffs it against Qdrant via `clojure.data/diff` on id-indexed maps, and either upserts (with a fresh embedding of `"<action-name>\n\n<description>"`), updates the payload in-place (when only non-content fields changed), or deletes (for tools removed from code). It runs **exactly once per JVM lifecycle — inside the `:pedestal/server` init-key, just before Jetty starts**. Any sync error aborts startup.
 
-Consequences:
-- Cold boot (and launchd kickstart) → sync runs.
-- `unsafe tools/restart {}` → halt + refresh-all + system/init fires the pedestal init-key again → sync re-runs.
-- `unsafe tools/refresh {}` → code reloads, sync does **not** run. `search` will return stale results until the next restart. Prefer `restart` after editing tool metadata.
+Restart the JVM to re-sync after editing tool metadata.
 
 ## Defining an action
 
@@ -73,7 +70,7 @@ Then require the ns from `src/tools/actions.clj` so it loads at startup:
 (ns tools.actions
   (:require
    [tools.actions.echo]
-   [tools.actions.system]
+   [tools.actions.token]
    [tools.actions.my-new-thing]))  ;; <- add
 ```
 
@@ -86,8 +83,6 @@ Then require the ns from `src/tools/actions.clj` so it loads at startup:
 | `echo/echo`        | safe   | any object                   | returns params unchanged |
 | `token/count-text` | safe   | `{text, encoding?}`          | count tokens in a string via tiktoken |
 | `token/count-file` | safe   | `{path, encoding?}`          | count tokens in a file's UTF-8 contents via tiktoken |
-| `tools/refresh`    | unsafe | `{}`                         | `clojure.tools.namespace.repl/refresh-all` over `src/` |
-| `tools/restart`    | unsafe | `{}`                         | halts the system, refreshes, re-inits; runs async so the HTTP response flushes first |
 
 Token actions require a Python 3 interpreter with `tiktoken` installed and a `libpython3.X.dylib` (or `.so`) findable by `libpython-clj`. Configure the executable in `resources/config.edn` under `:python/runtime {:python-executable ...}` (default `python3`). Default encoding is `cl100k_base` when `encoding` is omitted.
 
@@ -114,7 +109,7 @@ Response:
 ```
 src/tools/
   main.clj                 -main; requires system + actions barrel
-  system.clj               glass.system init/halt; marked no-unload
+  system.clj               glass.system init/halt
   pedestal.clj             jetty connector start/stop
   service.clj              /mcp route + ctx interceptor
   utils.clj                find-vars-by-meta
@@ -123,20 +118,12 @@ src/tools/
   actions.clj              barrel — requires every action ns
   actions/echo.clj         sample safe action
   actions/token.clj        token/count-{text,file} (safe, via tiktoken)
-  actions/system.clj       tools/refresh + tools/restart (unsafe)
   mcp/http.clj             pedestal interceptor, JSON-RPC framing
   mcp/server.clj           initialize / ping / tools/list / tools/call
   mcp/tools.clj            list-tools + safe/unsafe/search dispatcher
   mcp/search.clj           hybrid search (dense + lexical, RRF-merged)
 resources/config.edn       python, openai, qdrant, nrepl, pedestal
-deps.edn                   clojure, glass, malli, pedestal, nrepl, tools.namespace
+deps.edn                   clojure, glass, malli, pedestal, nrepl
 docker-compose.yml         qdrant service
 start.sh                   .env + docker + wait + clojure -M:dev -m tools.main
 ```
-
-## Notes
-
-- `refresh` reloads code dispatched through vars (the MCP pipeline, handlers). It does *not* swap values baked into Jetty's interceptor chain (routes, `mcp-handler` object). For those, use `restart`.
-- Refresh is scoped to `src/` via `clojure.tools.namespace.repl/set-refresh-dirs` — otherwise it tries to reload every `.clj` under every classpath dep.
-- `tools.system` carries `^{:clojure.tools.namespace.repl/load false :unload false}` so `-sys-vol` survives refreshes.
-- nREPL (4302) is bounced by `restart` too — any connected REPL sessions drop.

@@ -1,6 +1,4 @@
-(ns ^{:clojure.tools.namespace.repl/load   false
-      :clojure.tools.namespace.repl/unload false}
-  tools.system
+(ns tools.system
   (:require
    [clojure.java.io :as io]
    [glass.python :as python]
