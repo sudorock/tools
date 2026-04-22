@@ -23,7 +23,7 @@
 (defn list-tools
   []
   [{:name        "safe"
-    :description "Dispatch a safe action. `action` is a namespaced identifier (e.g. \"echo/echo\"); `params` is the action's input object."
+    :description "Dispatch a safe action. `action` is a namespaced identifier (e.g. \"token/count-text\"); `params` is the action's input object."
     :inputSchema generic-input-schema
     :annotations {:readOnlyHint    true
                   :destructiveHint false}}

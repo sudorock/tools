@@ -47,19 +47,21 @@ Restart the JVM to re-sync after editing tool metadata.
 
 A handler is just a function whose var carries four keys:
 
-```clojure
-(ns tools.actions.echo)
+See `src/tools/actions/token.clj` for a real example. A handler is a function whose var carries four keys:
 
-(defn ^{:tool/name         :echo/echo
+```clojure
+(defn ^{:tool/name         :token/count-text
         :tool/safety       :tool.safety/safe
-        :tool/input-schema :map
-        :tool/description  "Echo params back"}
-  echo
-  [_ctx params]
-  params)
+        :tool/input-schema [:map {:closed true}
+                            [:text :string]
+                            [:encoding {:optional true} [:maybe :string]]]
+        :tool/description  "Count tokens in the provided text using the shared Python tiktoken runtime."}
+  count-text
+  [{:python/keys [runtime]} {:keys [text] :as params}]
+  ...)
 ```
 
-- `:tool/name` — namespaced keyword; clients address it as the string form (`"echo/echo"`).
+- `:tool/name` — namespaced keyword; clients address it as the string form (`"token/count-text"`).
 - `:tool/safety` — `:tool.safety/safe` or `:tool.safety/unsafe`. Strictly enforced: calling `safe` on an unsafe action (or vice versa) returns a `safety mismatch` error.
 - `:tool/input-schema` — malli schema. Params are decoded with the JSON transformer and humanised errors are returned on validation failure.
 - `:tool/description` — free text.
@@ -69,7 +71,6 @@ Then require the ns from `src/tools/actions.clj` so it loads at startup:
 ```clojure
 (ns tools.actions
   (:require
-   [tools.actions.echo]
    [tools.actions.token]
    [tools.actions.my-new-thing]))  ;; <- add
 ```
@@ -80,7 +81,6 @@ Then require the ns from `src/tools/actions.clj` so it loads at startup:
 
 | action | safety | params | effect |
 |---|---|---|---|
-| `echo/echo`        | safe   | any object                   | returns params unchanged |
 | `token/count-text` | safe   | `{text, encoding?}`          | count tokens in a string via tiktoken |
 | `token/count-file` | safe   | `{path, encoding?}`          | count tokens in a file's UTF-8 contents via tiktoken |
 
@@ -92,15 +92,15 @@ Token actions require a Python 3 interpreter with `tiktoken` installed and a `li
 curl -s -XPOST http://127.0.0.1:4301/mcp -H 'content-type: application/json' -d '
 {"jsonrpc":"2.0","id":1,"method":"tools/call",
  "params":{"name":"safe",
-           "arguments":{"action":"echo/echo","params":{"hello":"world"}}}}'
+           "arguments":{"action":"token/count-text","params":{"text":"hello world"}}}}'
 ```
 
 Response:
 
 ```json
 {"jsonrpc":"2.0","id":1,"result":{
-  "content":[{"type":"text","text":"{\"hello\":\"world\"}"}],
-  "structuredContent":{"data":{"hello":"world"}},
+  "content":[{"type":"text","text":"{\"count\":2}"}],
+  "structuredContent":{"data":{"count":2}},
   "isError":false}}
 ```
 
@@ -116,7 +116,6 @@ src/tools/
   qdrant/migration.clj     ensure `tools` collection
   qdrant/sync.clj          diff var metadata ↔ qdrant, upsert/set/delete
   actions.clj              barrel — requires every action ns
-  actions/echo.clj         sample safe action
   actions/token.clj        token/count-{text,file} (safe, via tiktoken)
   mcp/http.clj             pedestal interceptor, JSON-RPC framing
   mcp/server.clj           initialize / ping / tools/list / tools/call
