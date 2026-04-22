@@ -2,6 +2,7 @@
   (:require
    [clojure.set :as set]
    [clojure.string :as str]
+   [glass.json :as json]
    [glass.service.openai.embedding :as openai.embedding]
    [glass.service.qdrant :as qdrant]
    [tools.qdrant.migration :as migration]))
@@ -63,7 +64,7 @@
   {:action       (get payload "action_name")
    :description  (get payload "description")
    :safety       (get payload "safety")
-   :input_schema (get payload "input_schema")
+   :input_schema (json/parse (get payload "input_schema"))
    :score        score})
 
 (defn search

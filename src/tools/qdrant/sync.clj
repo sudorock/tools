@@ -2,8 +2,10 @@
   (:require
    [clojure.data :as data]
    [clojure.set :as set]
+   [glass.json :as json]
    [glass.service.openai.embedding :as openai.embedding]
    [glass.service.qdrant :as qdrant]
+   [malli.core :as m]
    [tools.qdrant.migration :as migration]
    [tools.utils :as utils])
   (:import
@@ -35,7 +37,7 @@
      :payload {"action_name"  action
                "description"  desc
                "safety"       (safety-str (:tool/safety m))
-               "input_schema" (pr-str (:tool/input-schema m))
+               "input_schema" (json/stringify (m/form (:tool/input-schema m)))
                "content"      content}}))
 
 (defn- expected-points
