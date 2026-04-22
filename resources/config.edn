@@ -1,7 +1,13 @@
 {:python/runtime  {:python-executable "/Users/indy/dev/tools/.venv/bin/python"}
+ :openai/client   {:api-key #env "OPENAI_API_KEY"}
+ :qdrant/client   {:host "localhost"
+                   :port 7534
+                   :tls  false}
  :nrepl/server    {:host "0.0.0.0"
                    :port 4302}
- :pedestal/server {:ctx   {:python/runtime #sys/ref :python/runtime}
+ :pedestal/server {:ctx   {:python/runtime #sys/ref :python/runtime
+                           :openai/client  #sys/ref :openai/client
+                           :qdrant/client  #sys/ref :qdrant/client}
                    :host  "0.0.0.0"
                    :port  4301
                    :join? false}}

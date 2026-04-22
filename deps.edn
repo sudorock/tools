@@ -1,7 +1,7 @@
 {:paths ["src" "resources"]
  :deps {org.clojure/clojure          {:mvn/version "1.12.4"}
         sudorock/glass               {:git/url "https://github.com/sudorock/glass"
-                                      :git/sha "50c34ba03bc2fb3e5b1c260e5858031b400ae91c"
+                                      :git/sha "e8dad7269e9c35c1b023b7adc83a80cd23083d12"
                                       :exclusions [ring/ring-jetty-adapter]}
         metosin/malli                {:mvn/version "0.20.1"}
         org.clojure/tools.namespace  {:mvn/version "1.5.0"}

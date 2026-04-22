@@ -1,6 +1,6 @@
 # tools
 
-An MCP server that exposes exactly two generic tools — `safe` and `unsafe` — and dispatches each call to a concrete handler resolved from var metadata.
+An MCP server that exposes three top-level tools — `safe`, `unsafe`, and `search` — and dispatches `safe`/`unsafe` calls to concrete handlers resolved from var metadata. `search` runs hybrid (dense + lexical) queries over a Qdrant index of tool metadata.
 
 ## Run
 
@@ -8,9 +8,18 @@ An MCP server that exposes exactly two generic tools — `safe` and `unsafe` —
 ./start.sh
 ```
 
-Starts Pedestal on `127.0.0.1:4301/mcp` (HTTP JSON-RPC) and nREPL on `4302`. Both ports are configured in `resources/config.edn`.
+`start.sh` sources `.env` (if present — gitignored), brings up Docker's Qdrant container (ports 7533 REST / 7534 gRPC), waits for readiness, then launches the JVM. Pedestal listens on `127.0.0.1:4301/mcp` (HTTP JSON-RPC); nREPL on `4302`. All ports in `resources/config.edn`.
 
-Register with an MCP client that supports streamable HTTP:
+### Prerequisites
+
+- Docker Desktop running.
+- `OPENAI_API_KEY` available — either in the interactive shell that runs `start.sh`, or in a project-local `.env` file:
+  ```sh
+  echo 'OPENAI_API_KEY=sk-...' > .env
+  ```
+  `.env` is gitignored. The file form is needed for launchd, which doesn't inherit interactive shell env.
+
+### Register with an MCP client
 
 ```json
 "tools": { "type": "http", "url": "http://127.0.0.1:4301/mcp" }
@@ -60,18 +69,24 @@ Hardcoded paths assume the repo is at `/Users/indy/dev/tools` and Homebrew lives
 
 ## How it works
 
-An MCP client sees two tools:
+An MCP client sees three tools:
 
 - `safe`   — `readOnlyHint: true`,  `destructiveHint: false`
 - `unsafe` — `readOnlyHint: false`, `destructiveHint: true`
+- `search` — `readOnlyHint: true`,  `destructiveHint: false`
 
-Both take the same args:
+`safe` and `unsafe` take `{ "action": "<namespaced/name>", "params": { ... } }`. The dispatcher (`src/tools/mcp/tools.clj`) scans loaded namespaces for vars tagged with matching metadata, enforces the safety tag, malli-validates `params`, and invokes the handler. Handler's raw return wrapped as `{result}`; any throw becomes `{error}`.
 
-```json
-{ "action": "<namespaced/name>", "params": { ... } }
-```
+`search` takes `{ "query": "<text>", "limit": <1-50, default 10> }` and returns hits of the form `{action, description, safety, input_schema, score}` — ranked by RRF over a dense OpenAI embedding (`text-embedding-3-large`) plus a client-side lexical score. Each hit's payload is the full metadata snapshot taken at the last sync, so the caller can decide whether to route to `safe` or `unsafe` and how to fill the schema without a second round-trip.
 
-The dispatcher (`src/tools/mcp/tools.clj`) scans loaded namespaces for vars tagged with matching metadata, enforces the safety tag, malli-validates `params`, and invokes the handler. The handler's raw return is wrapped as `{result}`; any throw becomes `{error}`.
+## Sync — how Qdrant stays aligned with code
+
+`tools.sync/sync!` enumerates every var tagged with `:tool/name`, diffs it against Qdrant via `clojure.data/diff` on id-indexed maps, and either upserts (with a fresh embedding of `"<action-name>\n\n<description>"`), updates the payload in-place (when only non-content fields changed), or deletes (for tools removed from code). It runs **exactly once per JVM lifecycle — inside the `:pedestal/server` init-key, just before Jetty starts**. Any sync error aborts startup; launchd's `KeepAlive` restart-loops until the cause is fixed.
+
+Consequences:
+- Cold boot (and launchd kickstart) → sync runs.
+- `unsafe tools/restart {}` → halt + refresh-all + system/init fires the pedestal init-key again → sync re-runs.
+- `unsafe tools/refresh {}` → code reloads, sync does **not** run. `search` will return stale results until the next restart. Prefer `restart` after editing tool metadata.
 
 ## Defining an action
 
@@ -145,15 +160,20 @@ src/tools/
   pedestal.clj             jetty connector start/stop
   service.clj              /mcp route + ctx interceptor
   utils.clj                find-vars-by-meta
+  sync.clj                 diff var metadata ↔ qdrant, upsert/set/delete
+  qdrant/migration.clj     ensure `tools` collection + payload indexes
   actions.clj              barrel — requires every action ns
   actions/echo.clj         sample safe action
-  actions/system.clj       refresh + restart (unsafe)
+  actions/token.clj        token/count-{text,file} (safe, via tiktoken)
+  actions/system.clj       tools/refresh + tools/restart (unsafe)
   mcp/http.clj             pedestal interceptor, JSON-RPC framing
   mcp/server.clj           initialize / ping / tools/list / tools/call
-  mcp/tools.clj            list-tools + generic safe/unsafe dispatcher
-resources/config.edn       nrepl + pedestal config
+  mcp/tools.clj            list-tools + safe/unsafe/search dispatcher
+  mcp/search.clj           hybrid search (dense + lexical, RRF-merged)
+resources/config.edn       python, openai, qdrant, nrepl, pedestal
 deps.edn                   clojure, glass, malli, pedestal, nrepl, tools.namespace
-start.sh                   clojure -M:dev -m tools.main
+docker-compose.yml         qdrant service
+start.sh                   .env + docker + wait + clojure -M:dev -m tools.main
 ```
 
 ## Notes

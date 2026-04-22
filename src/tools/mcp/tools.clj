@@ -3,7 +3,15 @@
    [malli.core :as m]
    [malli.error :as me]
    [malli.transform :as mt]
+   [tools.mcp.search :as search]
    [tools.utils :as utils]))
+
+(def ^:private search-input-schema
+  {:type                 "object"
+   :properties           {:query {:type "string" :description "Search query."}
+                          :limit {:type "integer" :minimum 1 :maximum 50 :default 10}}
+   :required             ["query"]
+   :additionalProperties false})
 
 (def ^:private generic-input-schema
   {:type                 "object"
@@ -23,7 +31,12 @@
     :description "Dispatch an unsafe (state-changing) action."
     :inputSchema generic-input-schema
     :annotations {:readOnlyHint    false
-                  :destructiveHint true}}])
+                  :destructiveHint true}}
+   {:name        "search"
+    :description "Hybrid search over the registered action catalog. Returns hits with {action, description, safety, input_schema, score}."
+    :inputSchema search-input-schema
+    :annotations {:readOnlyHint    true
+                  :destructiveHint false}}])
 
 (defn- resolve-handler
   [action]
@@ -61,4 +74,8 @@
   (case tool-name
     "safe"   (dispatch :tool.safety/safe   ctx args)
     "unsafe" (dispatch :tool.safety/unsafe ctx args)
+    "search" (try
+               {:result (search/search ctx args)}
+               (catch Throwable t
+                 {:error {:message (or (.getMessage t) "internal error")}}))
     {:error {:message (str "unknown tool: " tool-name)}}))

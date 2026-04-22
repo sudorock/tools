@@ -4,3 +4,7 @@ target/
 classes/
 .DS_Store
 .venv/
+/qdrant/
+.env
+.idea/
+*.iml
