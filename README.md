@@ -69,8 +69,8 @@ Then require the ns from `src/tools/actions.clj` so it loads at startup:
 | action | safety | params | effect |
 |---|---|---|---|
 | `echo/echo`      | safe   | any object | returns params unchanged |
-| `system/refresh` | unsafe | `{}`       | `clojure.tools.namespace.repl/refresh-all` over `src/` |
-| `system/restart` | unsafe | `{}`       | halts the system, refreshes, re-inits; runs async so the HTTP response flushes first |
+| `tools/refresh` | unsafe | `{}`       | `clojure.tools.namespace.repl/refresh-all` over `src/` |
+| `tools/restart` | unsafe | `{}`       | halts the system, refreshes, re-inits; runs async so the HTTP response flushes first |
 
 ## Wire example
 

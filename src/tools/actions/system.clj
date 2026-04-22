@@ -15,7 +15,7 @@
     (instance? Throwable result) (throw result)
     :else                        (throw (ex-info (str "refresh failed: " result) {}))))
 
-(defn ^{:tool/name         :system/refresh
+(defn ^{:tool/name         :tools/refresh
         :tool/safety       :tool.safety/unsafe
         :tool/input-schema :map
         :tool/description  "Reload all namespaces via clojure.tools.namespace.repl/refresh-all."}
@@ -23,7 +23,7 @@
   [_ctx _params]
   (refresh-result (binding [*ns* *ns*] (repl/refresh-all))))
 
-(defn ^{:tool/name         :system/restart
+(defn ^{:tool/name         :tools/restart
         :tool/safety       :tool.safety/unsafe
         :tool/input-schema :map
         :tool/description  "Halt the system, reload all namespaces, and re-init. Runs asynchronously so the MCP response is flushed first."}
