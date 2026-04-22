@@ -1,4 +1,4 @@
-name: tools-mcp
+name: tools
 
 services:
   qdrant:
