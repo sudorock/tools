@@ -16,6 +16,48 @@ Register with an MCP client that supports streamable HTTP:
 "tools": { "type": "http", "url": "http://127.0.0.1:4301/mcp" }
 ```
 
+## Run as a launchd agent
+
+A plist is checked in at `launchd/com.sudorock.tools.plist`. It invokes `start.sh`, keeps the process alive, and writes stdout/stderr to `~/Library/Logs/com.sudorock.tools/`.
+
+```sh
+mkdir -p ~/Library/Logs/com.sudorock.tools
+ln -sf "$PWD/launchd/com.sudorock.tools.plist" ~/Library/LaunchAgents/com.sudorock.tools.plist
+launchctl load -w ~/Library/LaunchAgents/com.sudorock.tools.plist
+```
+
+Tail logs / check status / unload:
+
+```sh
+tail -F ~/Library/Logs/com.sudorock.tools/stderr.log
+launchctl list | rg com.sudorock.tools
+launchctl unload ~/Library/LaunchAgents/com.sudorock.tools.plist
+```
+
+Restart — three options, in order of preference:
+
+```sh
+# 1. Modern. SIGTERMs; KeepAlive respawns. `-k` kills first if running.
+launchctl kickstart -k gui/$(id -u)/com.sudorock.tools
+
+# 2. Stop; KeepAlive handles the respawn. Simpler, slightly less deterministic.
+launchctl stop com.sudorock.tools
+
+# 3. Only after editing the plist itself (paths, env, RunAtLoad, etc.).
+#    kickstart/stop won't re-read the plist; unload + load will.
+launchctl unload ~/Library/LaunchAgents/com.sudorock.tools.plist
+launchctl load   ~/Library/LaunchAgents/com.sudorock.tools.plist
+```
+
+Verify after a restart — the PID in `launchctl list` should change and the port should still be bound:
+
+```sh
+launchctl list com.sudorock.tools
+lsof -nP -iTCP:4301 -sTCP:LISTEN
+```
+
+Hardcoded paths assume the repo is at `/Users/indy/dev/tools` and Homebrew lives at `/opt/homebrew`. Edit the plist if either differs.
+
 ## How it works
 
 An MCP client sees two tools:
@@ -68,9 +110,13 @@ Then require the ns from `src/tools/actions.clj` so it loads at startup:
 
 | action | safety | params | effect |
 |---|---|---|---|
-| `echo/echo`      | safe   | any object | returns params unchanged |
-| `tools/refresh` | unsafe | `{}`       | `clojure.tools.namespace.repl/refresh-all` over `src/` |
-| `tools/restart` | unsafe | `{}`       | halts the system, refreshes, re-inits; runs async so the HTTP response flushes first |
+| `echo/echo`        | safe   | any object                   | returns params unchanged |
+| `token/count-text` | safe   | `{text, encoding?}`          | count tokens in a string via tiktoken |
+| `token/count-file` | safe   | `{path, encoding?}`          | count tokens in a file's UTF-8 contents via tiktoken |
+| `tools/refresh`    | unsafe | `{}`                         | `clojure.tools.namespace.repl/refresh-all` over `src/` |
+| `tools/restart`    | unsafe | `{}`                         | halts the system, refreshes, re-inits; runs async so the HTTP response flushes first |
+
+Token actions require a Python 3 interpreter with `tiktoken` installed and a `libpython3.X.dylib` (or `.so`) findable by `libpython-clj`. Configure the executable in `resources/config.edn` under `:python/runtime {:python-executable ...}` (default `python3`). Default encoding is `cl100k_base` when `encoding` is omitted.
 
 ## Wire example
 

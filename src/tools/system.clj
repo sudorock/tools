@@ -3,6 +3,7 @@
   tools.system
   (:require
    [clojure.java.io :as io]
+   [glass.python :as python]
    [glass.reader :as reader]
    [glass.system :as system]
    [nrepl.server :as nrepl]
@@ -14,6 +15,10 @@
   "For debugging purposes only."
   []
   (deref -sys-vol))
+
+(defmethod system/init-key :python/runtime
+  [_ {:keys [python-executable]}]
+  (python/init python-executable))
 
 (defmethod system/init-key :nrepl/server
   [_ {:keys [host port]}]

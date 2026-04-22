@@ -1,4 +1,6 @@
 .cpcache/
 .nrepl-port
 target/
+classes/
 .DS_Store
+.venv/

@@ -1,6 +1,7 @@
-{:nrepl/server    {:host "0.0.0.0"
+{:python/runtime  {:python-executable "/Users/indy/dev/tools/.venv/bin/python"}
+ :nrepl/server    {:host "0.0.0.0"
                    :port 4302}
- :pedestal/server {:ctx   {}
+ :pedestal/server {:ctx   {:python/runtime #sys/ref :python/runtime}
                    :host  "0.0.0.0"
                    :port  4301
                    :join? false}}
