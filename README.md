@@ -39,7 +39,7 @@ An MCP client sees three tools:
 
 ## Sync — how Qdrant stays aligned with code
 
-`tools.sync/sync!` enumerates every var tagged with `:tool/name`, diffs it against Qdrant via `clojure.data/diff` on id-indexed maps, and either upserts (with a fresh embedding of `"<action-name>\n\n<description>"`), updates the payload in-place (when only non-content fields changed), or deletes (for tools removed from code). It runs **exactly once per JVM lifecycle — inside the `:pedestal/server` init-key, just before Jetty starts**. Any sync error aborts startup.
+`tools.qdrant.sync/sync!` enumerates every var tagged with `:tool/name`, diffs it against Qdrant via `clojure.data/diff` on id-indexed maps, and either upserts (with a fresh embedding of `"<action-name>\n\n<description>"`), updates the payload in-place (when only non-content fields changed), or deletes (for tools removed from code). It runs **exactly once per JVM lifecycle — inside the `:pedestal/server` init-key, just before Jetty starts**. Any sync error aborts startup.
 
 Restart the JVM to re-sync after editing tool metadata.
 
@@ -113,8 +113,8 @@ src/tools/
   pedestal.clj             jetty connector start/stop
   service.clj              /mcp route + ctx interceptor
   utils.clj                find-vars-by-meta
-  sync.clj                 diff var metadata ↔ qdrant, upsert/set/delete
-  qdrant/migration.clj     ensure `tools` collection + payload indexes
+  qdrant/migration.clj     ensure `tools` collection
+  qdrant/sync.clj          diff var metadata ↔ qdrant, upsert/set/delete
   actions.clj              barrel — requires every action ns
   actions/echo.clj         sample safe action
   actions/token.clj        token/count-{text,file} (safe, via tiktoken)

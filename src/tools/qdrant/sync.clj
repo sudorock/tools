@@ -1,4 +1,4 @@
-(ns tools.sync
+(ns tools.qdrant.sync
   (:require
    [clojure.data :as data]
    [clojure.set :as set]

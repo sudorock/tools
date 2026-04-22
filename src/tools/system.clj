@@ -9,7 +9,7 @@
    [nrepl.server :as nrepl]
    [tools.pedestal :as pedestal]
    [tools.qdrant.migration :as qdrant.migration]
-   [tools.sync :as sync]))
+   [tools.qdrant.sync :as qdrant.sync]))
 
 (defonce ^:private -sys-vol (volatile! nil))
 
@@ -50,7 +50,7 @@
 
 (defmethod system/init-key :pedestal/server
   [_ {:keys [ctx host port join?]}]
-  (sync/sync! ctx)
+  (qdrant.sync/sync! ctx)
   (pedestal/start
    ctx
    {:host host
